@@ -91,6 +91,9 @@ func init() {
 	rootCmd.Flags().BoolVar(&noCover, "no-cover", false, "不额外携带歌曲的专辑封面图片")
 
 	rootCmd.PersistentFlags().BoolVarP(&debugMode, "debug", "d", false, "启用调试模式，输出详细日志")
+
+	// 直接关闭控制台检查提示
+	cobra.MousetrapHelpText = ""
 }
 
 // 4. 核心调度与业务执行

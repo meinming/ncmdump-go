@@ -3,3 +3,4 @@ test.*
 *.mp3
 *.flac
 *.ncm
+dist/
