@@ -16,7 +16,7 @@ func NewNCMRC4(key []byte) *NCMRC4 {
 
 	// 1. 初始化标准 S 盒 (0, 1, 2 ... 255)
 	var sBox [256]byte
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		sBox[i] = byte(i)
 	}
 

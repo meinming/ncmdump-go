@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"ncmdump/pkg/core" // 引入核心解密包
 	"ncmdump/pkg/logger"
 	"os"
@@ -42,7 +41,7 @@ var rootCmd = &cobra.Command{
 				if strings.HasSuffix(file, ".ncm") {
 					targetFiles = append(targetFiles, file)
 				} else {
-					fmt.Printf("[跳过] 文件 %s 后缀名不是 .ncm", file)
+					logger.Warn("[跳过] 文件 %s 后缀名不是 .ncm", file)
 				}
 			}
 		}
@@ -136,7 +135,7 @@ func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) {
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		logger.Error("%v", err)
 		os.Exit(1)
 	}
 }

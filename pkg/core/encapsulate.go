@@ -60,7 +60,7 @@ func (n *NeteaseCloudMusicFile) EncapsulateMp3(outputPath string, noMeta bool, n
 		}
 		logger.Debug("开始添加封面：minmeType=%v(%v)", mimeType, imgType)
 		picFrame := id3v2.PictureFrame{
-			Encoding:    id3v2.EncodingUTF8,
+			Encoding:    id3v2.EncodingISO,
 			MimeType:    mimeType,
 			PictureType: id3v2.PTFrontCover, // 正面封面标记
 			Description: "Front cover",
@@ -138,7 +138,7 @@ func (n *NeteaseCloudMusicFile) EncapsulateFlac(outputPath string, noMeta bool, 
 		// 构建 FLAC 规范的 Picture 块
 		fp, err := flacpicture.NewFromImageData(flacpicture.PictureTypeFrontCover, "Cover", n.CoverPic, mimeType)
 		if err != nil {
-			return fmt.Errorf("")
+			return fmt.Errorf("添加封面失败：%w", err)
 		}
 
 		// 序列化为二进制数据块并追加进 FLAC

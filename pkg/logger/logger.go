@@ -32,7 +32,7 @@ func Info(format string, v ...interface{}) {
 	fmt.Printf("%s %s[INFO]%s  %s\n", getTimestamp(), colorInfo, colorReset, msg)
 }
 
-// Debug 打印调试信息（解密算法使用）
+// Debug 打印调试信息
 func Debug(format string, v ...interface{}) {
 	if !DebugEnabled {
 		return
@@ -41,7 +41,7 @@ func Debug(format string, v ...interface{}) {
 	fmt.Printf("%s %s[DEBUG]%s %s\n", getTimestamp(), colorDebug, colorReset, msg)
 }
 
-// Warn 打印警告信息（no metadata found）
+// Warn 打印警告信息
 func Warn(format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
 	fmt.Printf("%s %s[WARN]%s  %s\n", getTimestamp(), colorWarn, colorReset, msg)
