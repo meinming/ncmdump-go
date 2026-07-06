@@ -42,7 +42,7 @@ var rootCmd = &cobra.Command{
 				if strings.HasSuffix(file, ".ncm") {
 					targetFiles = append(targetFiles, file)
 				} else {
-					fmt.Printf("[跳过] 文件 %s 后缀名不是 .ncm\n", file)
+					fmt.Printf("[跳过] 文件 %s 后缀名不是 .ncm", file)
 				}
 			}
 		}
@@ -72,8 +72,8 @@ var rootCmd = &cobra.Command{
 		}
 
 		// 打印初始化的解析状态（方便调试）
-		logger.Info("开始处理，目标输出目录: %s\n", outFolder)
-		logger.Debug("导出元数据: %v | 导出封面: %v\n", !noMetadata, !noCover)
+		logger.Info("开始处理，目标输出目录: %s", outFolder)
+		logger.Debug("导出元数据: %v | 导出封面: %v", !noMetadata, !noCover)
 
 		for _, ncmPath := range targetFiles {
 			// 调用下方的具体执行函数
@@ -96,12 +96,12 @@ func init() {
 
 // 4. 核心调度与业务执行
 func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) {
-	logger.Info("[正在处理]: %s ...\n", ncmPath)
+	logger.Info("[正在处理]: %s ...", ncmPath)
 
 	// 文件夹存在就不做操作，不存在就逐层创建
 	err := os.MkdirAll(outDir, os.ModePerm)
 	if err != nil {
-		logger.Error("  [错误] 无法创建输出目录 %s: %v\n", outDir, err)
+		logger.Error("  [错误] 无法创建输出目录 %s: %v", outDir, err)
 		return
 	}
 
@@ -130,7 +130,7 @@ func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) {
 		}
 	}
 
-	logger.Info("音频文件已成功还原至: %s\n", musicOutputPath)
+	logger.Info("音频文件已成功还原至: %s", musicOutputPath)
 
 }
 

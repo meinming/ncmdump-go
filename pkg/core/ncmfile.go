@@ -110,7 +110,7 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 		if coverLength > 0 {
 			CoverPic := make([]byte, coverLength)
 			_, err = n.file.Read(CoverPic)
-			os.WriteFile("test.png", CoverPic, 0664)
+			// os.WriteFile("test.png", CoverPic, 0664)
 
 			if err != nil {
 				return fmt.Errorf("读取 MP3 本地封面字节失败: %v", err)
