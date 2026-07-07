@@ -99,32 +99,37 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 	case "flac":
 		if coverLength != 0 {
 			logger.Warn("存在Cover, 可能出现问题")
-			CoverPic := make([]byte, coverLength)
-			_, err = n.file.Read(CoverPic)
+			n.CoverPic = make([]byte, coverLength)
+			_, err = n.file.Read(n.CoverPic)
 			// os.WriteFile("test.png", CoverPic, 0664)
 
 			if err != nil {
 				return fmt.Errorf("读取 FLAC 本地封面字节失败: %w", err)
 			}
-			n.CoverPic = CoverPic
 		} else if n.Metadata.AlbumPic != "" {
 			n.CoverPic, err = coverGet(n.Metadata.AlbumPic)
 			if err != nil {
 				logger.Warn("从网络下载 FLAC 封面失败: %v，将生成无封面音频", err)
 			}
+		} else {
+			logger.Warn("无法通过已知途径得到 FLAC 封面，将生成无封面音频")
 		}
 	case "mp3":
-		if coverLength > 0 {
-			CoverPic := make([]byte, coverLength)
-			_, err = n.file.Read(CoverPic)
+		if coverLength != 0 {
+			n.CoverPic = make([]byte, coverLength)
+			_, err = n.file.Read(n.CoverPic)
 			// os.WriteFile("test.png", CoverPic, 0664)
 
 			if err != nil {
 				return fmt.Errorf("读取 MP3 本地封面字节失败: %w", err)
 			}
-			n.CoverPic = CoverPic
+		} else if n.Metadata.AlbumPic != "" {
+			n.CoverPic, err = coverGet(n.Metadata.AlbumPic)
+			if err != nil {
+				logger.Warn("从网络下载 MP3 封面失败: %v，将生成无封面音频", err)
+			}
 		} else {
-			logger.Warn("该 ncm 文件未包含内置封面(?) 可能引发错误")
+			logger.Warn("无法通过已知途径得到 MP3 封面，将生成无封面音频")
 		}
 	}
 
