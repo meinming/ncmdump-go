@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+	"io/fs"
 	"ncmdump/pkg/core" // 引入核心解密包
 	"ncmdump/pkg/logger"
 	"os"
@@ -11,10 +13,11 @@ import (
 )
 
 var (
-	inFolder   string
-	outFolder  string
-	noMetadata bool
-	noCover    bool
+	inFolder    string
+	outFolder   string
+	noMetadata  bool
+	noCover     bool
+	scanSubDirs bool
 )
 
 var debugMode bool
@@ -34,9 +37,16 @@ var rootCmd = &cobra.Command{
 		// 统一存储所有即将被处理的 .ncm 文件路径
 		var targetFiles []string
 
-		// 传入具体的文件列表 (位置参数)
 		if len(args) > 0 {
 			for _, file := range args {
+				if isdir, err := IsDir(file); err == nil && isdir {
+					dirFile, err := searchDir(file, scanSubDirs)
+					if err != nil {
+						targetFiles = append(targetFiles, dirFile...)
+					}
+				} else if err != nil {
+					logger.Error("%v", err)
+				}
 				// 计算机思维：这里做一步安全校验，防止用户误输入非 ncm 文件
 				if strings.HasSuffix(file, ".ncm") {
 					targetFiles = append(targetFiles, file)
@@ -49,18 +59,9 @@ var rootCmd = &cobra.Command{
 		// 指定输入文件夹 (--in-folder)
 		if inFolder != "" {
 			// 读取文件夹下的所有文件和子目录
-			files, err := os.ReadDir(inFolder)
+			dirFile, err := searchDir(inFolder, scanSubDirs)
 			if err != nil {
-				logger.Error("无法读取输入文件夹: %v", err)
-			}
-
-			for _, file := range files {
-				// 排除子文件夹，且文件名必须以 .ncm 结尾
-				if !file.IsDir() && strings.HasSuffix(file.Name(), ".ncm") {
-					// 将文件夹路径与文件名拼接成一个完整的绝对/相对路径
-					fullPath := filepath.Join(inFolder, file.Name())
-					targetFiles = append(targetFiles, fullPath)
-				}
+				targetFiles = append(targetFiles, dirFile...)
 			}
 		}
 
@@ -89,6 +90,7 @@ func init() {
 
 	rootCmd.Flags().BoolVar(&noMetadata, "no-metadata", false, "不携带歌曲的元数据")
 	rootCmd.Flags().BoolVar(&noCover, "no-cover", false, "不额外携带歌曲的专辑封面图片")
+	rootCmd.Flags().BoolVarP(&scanSubDirs, "traversal", "t", false, "启动遍历文件夹，自动遍历文件夹下所有文件")
 
 	rootCmd.PersistentFlags().BoolVarP(&debugMode, "debug", "d", false, "启用调试模式，输出详细日志")
 
@@ -134,6 +136,52 @@ func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) {
 
 	logger.Info("音频文件已成功还原至: %s", musicOutputPath)
 
+}
+
+func IsDir(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, fmt.Errorf("路径不存在: %s", path)
+		} else {
+			return false, fmt.Errorf("发生其他错误: %v", err)
+		}
+	}
+
+	// 3. 判断是目录还是文件
+	if fileInfo.IsDir() {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func searchDir(root string, scanSubDirs bool) ([]string, error) {
+	var Files []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			logger.Warn("[跳过] 访问出错,已跳过目录%v: %v", path, err)
+			if d != nil && d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// 如果当前路径不是根目录，并且是一个目录，且用户不想扫描子目录，则跳过
+		if path != root && d.IsDir() && !scanSubDirs {
+			return filepath.SkipDir
+		}
+
+		if !d.IsDir() && strings.HasSuffix(path, ".ncm") {
+			Files = append(Files, path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return []string{}, fmt.Errorf("扫描失败: %v", err)
+	}
+	return Files, nil
 }
 
 func Execute() {
