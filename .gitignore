@@ -4,3 +4,4 @@ test.*
 *.flac
 *.ncm
 dist/
+upx-5.2.0-win64/
