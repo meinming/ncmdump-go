@@ -23,7 +23,7 @@ var (
 var debugMode bool
 
 var rootCmd = &cobra.Command{
-	Use:   "ncmdump [files...]",
+	Use:   "ncmdump [dir... | file...]",
 	Short: "Decrypt .ncm files",
 	Args:  cobra.ArbitraryArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
@@ -78,7 +78,11 @@ var rootCmd = &cobra.Command{
 
 		for _, ncmPath := range targetFiles {
 			// 调用下方的具体执行函数
-			processSingleFile(ncmPath, outFolder, noMetadata, noCover)
+			err := processSingleFile(ncmPath, outFolder, noMetadata, noCover)
+			if err != nil {
+				logger.Error("[跳过文件] %s 处理失败: %v", ncmPath, err)
+				continue
+			}
 		}
 	},
 }
@@ -86,8 +90,8 @@ var rootCmd = &cobra.Command{
 func init() {
 	// Go 语言使用指针（&变量名）来让 Cobra 直接把命令行的数据写入到刚才定义的全局变量中。
 
-	rootCmd.Flags().StringVar(&inFolder, "in-folder", "", "要批量解密的输入文件夹路径")
-	rootCmd.Flags().StringVar(&outFolder, "out-folder", ".", "转换后音频文件的输出存放目录")
+	rootCmd.Flags().StringVarP(&inFolder, "in-folder", "i", "", "要批量解密的输入文件夹路径")
+	rootCmd.Flags().StringVarP(&outFolder, "out-folder", "o", ".", "转换后音频文件的输出存放目录")
 
 	rootCmd.Flags().BoolVar(&noMetadata, "no-metadata", false, "不携带歌曲的元数据")
 	rootCmd.Flags().BoolVar(&noCover, "no-cover", false, "不携带歌曲的专辑封面图片")
@@ -100,14 +104,14 @@ func init() {
 }
 
 // 4. 核心调度与业务执行
-func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) {
+func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) error {
 	logger.Info("[正在处理]: %s ...", ncmPath)
 
 	// 文件夹存在就不做操作，不存在就逐层创建
 	err := os.MkdirAll(outDir, os.ModePerm)
 	if err != nil {
 		logger.Error("  [错误] 无法创建输出目录 %s: %v", outDir, err)
-		return
+		return err
 	}
 
 	fileName := filepath.Base(ncmPath)               // "周杰伦 - 晴天.ncm"
@@ -117,6 +121,7 @@ func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) {
 	err = ncmFile.Decrypt()
 	if err != nil {
 		logger.Error("%v", err.Error())
+		return err
 	}
 	audioFormat := ncmFile.Metadata.Format // "mp3" or "flac"
 
@@ -127,15 +132,19 @@ func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) {
 		err := ncmFile.EncapsulateMp3(musicOutputPath, noMeta, noCv)
 		if err != nil {
 			logger.Error("%v", err.Error())
+			return err
 		}
 	case "flac":
 		err := ncmFile.EncapsulateFlac(musicOutputPath, noMeta, noCv)
 		if err != nil {
 			logger.Error("%v", err.Error())
+			return err
 		}
 	}
 
 	logger.Info("音频文件已成功还原至: %s", musicOutputPath)
+
+	return nil
 
 }
 

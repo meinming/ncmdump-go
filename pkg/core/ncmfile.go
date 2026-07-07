@@ -101,7 +101,7 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 			logger.Warn("存在Cover, 可能出现问题")
 			CoverPic := make([]byte, coverLength)
 			_, err = n.file.Read(CoverPic)
-			os.WriteFile("test.png", CoverPic, 0664)
+			// os.WriteFile("test.png", CoverPic, 0664)
 
 			if err != nil {
 				return fmt.Errorf("读取 FLAC 本地封面字节失败: %w", err)
