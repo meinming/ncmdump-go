@@ -17,7 +17,7 @@ const metadataXorByte byte = 0x63
 
 var metaPrefixToRemove = []byte("163 key(Don't modify):")
 
-// NcmMetadata 定义解密后 JSON 映射的结构体（根据网易云实际返回字段定义）
+// NcmMetadata 解密后 JSON 映射的结构体
 type NcmMetadata struct {
 	Format    string       `json:"format"`    //"flac"
 	MusicName string       `json:"musicName"` //"カタオモイ",
@@ -92,7 +92,7 @@ func (d *Decoder) DecryptMetadata() error {
 	}
 
 	// 6. 将裁剪掉前缀 "music:" 后的 JSON 明文解析到结构体中
-	// 网易云解密出的明文通常形如: music:{"musicId":444269135,"musicName":"..."}
+	// 解密出的明文通常形如: music:{"musicId":444269135,"musicName":"..."}
 	musicPrefix := []byte("music:")
 	djPrefix := []byte("dj:")
 	unpaddedData = bytes.TrimPrefix(unpaddedData, musicPrefix)

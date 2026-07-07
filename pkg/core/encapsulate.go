@@ -10,14 +10,13 @@ import (
 	"os"
 	"strings"
 
-	// 引入第三方音频封装库
 	"github.com/bogem/id3v2"
 	"github.com/go-flac/flacpicture"
 	"github.com/go-flac/flacvorbis"
 	"github.com/go-flac/go-flac"
 )
 
-// 核心方法 1：MP3 容器封装 (ID3v2 标准)
+// MP3 容器封装 (ID3v2 标准)
 func (n *NeteaseCloudMusicFile) EncapsulateMp3(outputPath string, noMeta bool, noCv bool) error {
 	// 1. 先将解密出来的裸音频数据流（MusicStream）写入目标文件
 	err := os.WriteFile(outputPath, n.MusicStream, 0644)
@@ -74,7 +73,7 @@ func (n *NeteaseCloudMusicFile) EncapsulateMp3(outputPath string, noMeta bool, n
 	return tag.Save()
 }
 
-// 核心方法 2：FLAC 容器封装 (Metadata Block 标准)
+// FLAC 容器封装 (Metadata Block 标准)
 func (n *NeteaseCloudMusicFile) EncapsulateFlac(outputPath string, noMeta bool, noCv bool) error {
 	// 1. 先将解密出来的无损数据流写入目标文件
 	err := os.WriteFile(outputPath, n.MusicStream, 0644)
@@ -97,35 +96,36 @@ func (n *NeteaseCloudMusicFile) EncapsulateFlac(outputPath string, noMeta bool, 
 			break
 		}
 	}
-
-	var vc *flacvorbis.MetaDataBlockVorbisComment
-	if commentBlock != nil {
-		vc, err = flacvorbis.ParseFromMetaDataBlock(*commentBlock)
-		if err != nil {
-			return err
+	if !noMeta {
+		var vc *flacvorbis.MetaDataBlockVorbisComment
+		if commentBlock != nil {
+			vc, err = flacvorbis.ParseFromMetaDataBlock(*commentBlock)
+			if err != nil {
+				return err
+			}
+		} else {
+			vc = flacvorbis.New()
 		}
-	} else {
-		vc = flacvorbis.New()
+
+		// 写入键值对标签
+		_ = vc.Add("TITLE", n.Metadata.MusicName)
+		_ = vc.Add("ALBUM", n.Metadata.Album)
+		for _, artist := range n.Metadata.GetArtists() {
+			_ = vc.Add("ARTIST", artist)
+		}
+
+		// 把修改后的评论块放回 FLAC 结构中
+		updatedComment := vc.Marshal()
+		if commentBlock != nil {
+			*commentBlock = updatedComment
+		} else {
+			f.Meta = append(f.Meta, &updatedComment)
+		}
 	}
 
-	// 写入键值对标签
-	_ = vc.Add("TITLE", n.Metadata.MusicName)
-	_ = vc.Add("ALBUM", n.Metadata.Album)
-	for _, artist := range n.Metadata.GetArtists() {
-		_ = vc.Add("ARTIST", artist)
-	}
-
-	// 把修改后的评论块放回 FLAC 结构中
-	updatedComment := vc.Marshal()
-	if commentBlock != nil {
-		*commentBlock = updatedComment
-	} else {
-		f.Meta = append(f.Meta, &updatedComment)
-	}
-
-	// 4. 组装复杂的图片标签块 (METADATA_BLOCK_PICTURE)
-	if len(n.CoverPic) > 0 {
-		// 计算机思维：用流读取图片头部的宽高，而不需要在内存中完全把图片解压放大
+	// 4. 组装图片标签块 (METADATA_BLOCK_PICTURE)
+	if len(n.CoverPic) > 0 && !noCv {
+		// 用流读取图片头部的宽高，而不需要在内存中完全把图片解压放大
 		_, imgType, err := image.DecodeConfig(bytes.NewReader(n.CoverPic))
 		if err != nil {
 			return fmt.Errorf("解析封面图片维度失败: %w", err)

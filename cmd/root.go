@@ -41,13 +41,14 @@ var rootCmd = &cobra.Command{
 			for _, file := range args {
 				if isdir, err := IsDir(file); err == nil && isdir {
 					dirFile, err := searchDir(file, scanSubDirs)
+					targetFiles = append(targetFiles, dirFile...)
 					if err != nil {
-						targetFiles = append(targetFiles, dirFile...)
+						logger.Error("%v", err)
 					}
 				} else if err != nil {
 					logger.Error("%v", err)
 				}
-				// 计算机思维：这里做一步安全校验，防止用户误输入非 ncm 文件
+				// 安全校验，防止用户误输入非 ncm 文件
 				if strings.HasSuffix(file, ".ncm") {
 					targetFiles = append(targetFiles, file)
 				} else {
@@ -89,12 +90,12 @@ func init() {
 	rootCmd.Flags().StringVar(&outFolder, "out-folder", ".", "转换后音频文件的输出存放目录")
 
 	rootCmd.Flags().BoolVar(&noMetadata, "no-metadata", false, "不携带歌曲的元数据")
-	rootCmd.Flags().BoolVar(&noCover, "no-cover", false, "不额外携带歌曲的专辑封面图片")
+	rootCmd.Flags().BoolVar(&noCover, "no-cover", false, "不携带歌曲的专辑封面图片")
 	rootCmd.Flags().BoolVarP(&scanSubDirs, "traversal", "t", false, "启动遍历文件夹，自动遍历文件夹下所有文件")
 
 	rootCmd.PersistentFlags().BoolVarP(&debugMode, "debug", "d", false, "启用调试模式，输出详细日志")
 
-	// 直接关闭控制台检查提示
+	// 关闭控制台检查提示
 	cobra.MousetrapHelpText = ""
 }
 
