@@ -27,7 +27,7 @@ func NewNeteaseCloudMusicFile(path string) *NeteaseCloudMusicFile {
 func (n *NeteaseCloudMusicFile) Decrypt() error {
 	file, err := os.Open(n.Path)
 	if err != nil {
-		return fmt.Errorf("Failed to read file:%v", err)
+		return fmt.Errorf("Failed to read file:%w", err)
 	}
 	n.file = file
 	defer n.file.Close()
@@ -36,7 +36,7 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 	headerBytes := make([]byte, 8)
 	_, err = n.file.Read(headerBytes)
 	if err != nil {
-		return fmt.Errorf("Failed to read Header: %v", err)
+		return fmt.Errorf("Failed to read Header: %w", err)
 	}
 	if string(headerBytes) != "CTENFDAM" {
 		return fmt.Errorf("Not a valid NetEase Cloud Music (NCM) file.")
@@ -48,7 +48,7 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 	lengthBytes := make([]byte, 4)
 	_, err = n.file.Read(lengthBytes)
 	if err != nil {
-		return fmt.Errorf("Failed to read Length of AES key: %v", err)
+		return fmt.Errorf("Failed to read Length of AES key: %w", err)
 	}
 	keyLength := binary.LittleEndian.Uint32(lengthBytes)
 	logger.Debug("Reading length of AES key is succeed: %v bytes", keyLength)
@@ -56,33 +56,33 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 	keyCiphertext := make([]byte, keyLength)
 	_, err = n.file.Read(keyCiphertext)
 	if err != nil {
-		return fmt.Errorf("Failed to read key cipher: %v", err)
+		return fmt.Errorf("Failed to read key cipher: %w", err)
 	}
 
 	h := crypto.Decoder{Rc4KeyEnc: keyCiphertext}
 
 	err = h.DecryptRC4Key()
 	if err != nil {
-		return fmt.Errorf("Failed to decrypt RC4 key with AES: %v", err)
+		return fmt.Errorf("Failed to decrypt RC4 key with AES: %w", err)
 	}
 	n.Rc4Key = h.Rc4Key
 
 	metaLengthBytes := make([]byte, 4)
 	_, err = n.file.Read(metaLengthBytes)
 	if err != nil {
-		return fmt.Errorf("Failed to read metadata length: %v", err)
+		return fmt.Errorf("Failed to read metadata length: %w", err)
 	}
 	h.MetadataEncSize = binary.LittleEndian.Uint32(metaLengthBytes)
 	logger.Debug("Reading length of metadata is succeed: %v bytes", h.MetadataEncSize)
 	metadataEnc := make([]byte, h.MetadataEncSize)
 	_, err = n.file.Read(metadataEnc)
 	if err != nil {
-		return fmt.Errorf("Failed to read metadata cipher: %v", err)
+		return fmt.Errorf("Failed to read metadata cipher: %w", err)
 	}
 	h.MetadataEnc = metadataEnc
 	err = h.DecryptMetadata()
 	if err != nil {
-		return fmt.Errorf("Failed to decrypt metadata: %v", err)
+		return fmt.Errorf("Failed to decrypt metadata: %w", err)
 	}
 	n.Metadata = h.Metadata
 
@@ -91,7 +91,7 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 	coverLengthBytes := make([]byte, 4)
 	_, err = n.file.Read(coverLengthBytes)
 	if err != nil {
-		return fmt.Errorf("Failed to read Length of cover: %v", err)
+		return fmt.Errorf("Failed to read Length of cover: %w", err)
 	}
 	coverLength := binary.LittleEndian.Uint32(coverLengthBytes)
 	logger.Debug("Reading length of cover is succeed: %d bytes", coverLength)
@@ -113,7 +113,7 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 			// os.WriteFile("test.png", CoverPic, 0664)
 
 			if err != nil {
-				return fmt.Errorf("读取 MP3 本地封面字节失败: %v", err)
+				return fmt.Errorf("读取 MP3 本地封面字节失败: %w", err)
 			}
 			n.CoverPic = CoverPic
 		} else {
@@ -133,7 +133,7 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 
 			_, writeErr := musicStream.Write(currentBlock)
 			if writeErr != nil {
-				return fmt.Errorf("写入二进制流失败: %v", writeErr)
+				return fmt.Errorf("写入二进制流失败: %w", writeErr)
 			}
 		}
 
@@ -141,7 +141,7 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 			break // 文件读完了，安全退出
 		}
 		if err != nil {
-			return fmt.Errorf("读取音频数据失败: %v", err)
+			return fmt.Errorf("读取音频数据失败: %w", err)
 		}
 	}
 	n.MusicStream = musicStream.Bytes()
@@ -153,7 +153,7 @@ func coverGet(imgUrl string) ([]byte, error) {
 	logger.Debug("正在请求封面：%v", imgUrl)
 	resp, err := http.Get(imgUrl)
 	if err != nil {
-		return nil, fmt.Errorf("网络请求失败: %v", err)
+		return nil, fmt.Errorf("网络请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -163,7 +163,7 @@ func coverGet(imgUrl string) ([]byte, error) {
 
 	imgBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取图片二进制流失败: %v", err)
+		return nil, fmt.Errorf("读取图片二进制流失败: %w", err)
 	}
 
 	return imgBytes, nil

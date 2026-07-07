@@ -144,7 +144,7 @@ func IsDir(path string) (bool, error) {
 		if os.IsNotExist(err) {
 			return false, fmt.Errorf("路径不存在: %s", path)
 		} else {
-			return false, fmt.Errorf("发生其他错误: %v", err)
+			return false, fmt.Errorf("发生其他错误: %w", err)
 		}
 	}
 
@@ -179,7 +179,7 @@ func searchDir(root string, scanSubDirs bool) ([]string, error) {
 	})
 
 	if err != nil {
-		return []string{}, fmt.Errorf("扫描失败: %v", err)
+		return []string{}, fmt.Errorf("扫描失败: %w", err)
 	}
 	return Files, nil
 }
