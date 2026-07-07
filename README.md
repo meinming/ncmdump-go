@@ -19,7 +19,7 @@
 确保您的开发环境已安装 **Go 1.22+**：
 
 ```bash
-git clone [https://github.com/meinming/ncmdump-go.git](https://github.com/meinming/ncmdump-go.git)
+git clone https://github.com/meinming/ncmdump-go.git
 cd ncmdump-go
 go build -o ncmdump main.go
 ```
@@ -74,5 +74,5 @@ go build -o ncmdump main.go
 
 ## 🥰 特别鸣谢
 
-- 感谢我亦师亦友的朋友@eternal-flame-AD提供的支持
+- 感谢我亦师亦友的朋友[Yumechi](https://github.com/eternal-flame-AD)提供的支持
 - 感谢同类项目：[yoki/ncmdump](https://github.com/yoki123/ncmdump)
