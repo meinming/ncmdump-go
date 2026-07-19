@@ -3,21 +3,23 @@ package cmd
 import (
 	"fmt"
 	"io/fs"
-	"ncmdump/pkg/core" // 引入核心解密包
-	"ncmdump/pkg/logger"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"ncmdump/pkg/core" // 引入核心解密包
+	"ncmdump/pkg/logger"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	inFolder    string
-	outFolder   string
-	noMetadata  bool
-	noCover     bool
-	scanSubDirs bool
+	inFolder     string
+	outFolder    string
+	noMetadata   bool
+	noCover      bool
+	scanSubDirs  bool
+	compressFlac bool
 )
 
 var debugMode bool
@@ -33,7 +35,6 @@ var rootCmd = &cobra.Command{
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-
 		// 统一存储所有即将被处理的 .ncm 文件路径
 		var targetFiles []string
 
@@ -49,10 +50,10 @@ var rootCmd = &cobra.Command{
 					logger.Error("%v", err)
 				}
 				// 安全校验，防止用户误输入非 ncm 文件
-				if strings.HasSuffix(file, ".ncm") {
+				if strings.HasSuffix(file, ".ncm") || strings.HasSuffix(file, ".flac") || strings.HasSuffix(file, ".mp3") {
 					targetFiles = append(targetFiles, file)
 				} else {
-					logger.Warn("[跳过] 文件 %s 后缀名不是 .ncm", file)
+					logger.Warn("[跳过] 文件 %s 后缀名不是 .ncm、.flac 或 .mp3", file)
 				}
 			}
 		}
@@ -96,6 +97,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&noMetadata, "no-metadata", false, "不携带歌曲的元数据")
 	rootCmd.Flags().BoolVar(&noCover, "no-cover", false, "不携带歌曲的专辑封面图片")
 	rootCmd.Flags().BoolVarP(&scanSubDirs, "traversal", "t", false, "启动遍历文件夹，自动遍历文件夹下所有文件")
+	rootCmd.Flags().BoolVar(&compressFlac, "compress-flac", false, "压缩 flac 音频文件到 mp3 格式")
 
 	rootCmd.PersistentFlags().BoolVarP(&debugMode, "debug", "d", false, "启用调试模式，输出详细日志")
 
@@ -114,8 +116,8 @@ func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) er
 		return err
 	}
 
-	fileName := filepath.Base(ncmPath)               // "周杰伦 - 晴天.ncm"
-	baseName := strings.TrimSuffix(fileName, ".ncm") // "周杰伦 - 晴天"
+	fileName := filepath.Base(ncmPath)                               // "周杰伦 - 晴天.ncm"
+	baseName := strings.TrimSuffix(fileName, filepath.Ext(fileName)) // "周杰伦 - 晴天"
 
 	ncmFile := core.NewNeteaseCloudMusicFile(ncmPath)
 	err = ncmFile.Decrypt()
@@ -145,7 +147,6 @@ func processSingleFile(ncmPath string, outDir string, noMeta bool, noCv bool) er
 	logger.Info("音频文件已成功还原至: %s", musicOutputPath)
 
 	return nil
-
 }
 
 func IsDir(path string) (bool, error) {
@@ -182,12 +183,11 @@ func searchDir(root string, scanSubDirs bool) ([]string, error) {
 			return filepath.SkipDir
 		}
 
-		if !d.IsDir() && strings.HasSuffix(path, ".ncm") {
+		if !d.IsDir() && (strings.HasSuffix(path, ".ncm") || strings.HasSuffix(path, ".flac") || strings.HasSuffix(path, ".mp3")) {
 			Files = append(Files, path)
 		}
 		return nil
 	})
-
 	if err != nil {
 		return []string{}, fmt.Errorf("扫描失败: %w", err)
 	}
