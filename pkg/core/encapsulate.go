@@ -1,14 +1,17 @@
 package core
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"image"
 	_ "image/jpeg" // 注册 JPEG 自动解码器
 	_ "image/png"  // 注册 PNG 自动解码器
-	"ncmdump/pkg/logger"
+	"io"
 	"os"
 	"strings"
+
+	"ncmdump/pkg/logger"
 
 	"github.com/bogem/id3v2"
 	"github.com/go-flac/flacpicture"
@@ -18,14 +21,12 @@ import (
 
 // MP3 容器封装 (ID3v2 标准)
 func (n *NeteaseCloudMusicFile) EncapsulateMp3(outputPath string, noMeta bool, noCv bool) error {
-	// 1. 先将解密出来的裸音频数据流（MusicStream）写入目标文件
-	err := os.WriteFile(outputPath, n.MusicStream, 0644)
-	if err != nil {
-		return fmt.Errorf("写入 MP3 基础音频流失败: %w", err)
-	}
+	defer n.MusicStream.Close()
+
+	reader := bufio.NewReader(n.MusicStream)
 
 	// 2. 打开该 MP3 文件开始注入 ID3 标签
-	tag, err := id3v2.Open(outputPath, id3v2.Options{Parse: true})
+	tag, err := id3v2.ParseReader(reader, id3v2.Options{Parse: true})
 	if err != nil {
 		return fmt.Errorf("打开 MP3 ID3 容器失败: %w", err)
 	}
@@ -70,19 +71,28 @@ func (n *NeteaseCloudMusicFile) EncapsulateMp3(outputPath string, noMeta bool, n
 	}
 
 	// 5. 保存并闭合文件
-	return tag.Save()
+	outputFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("创建输出文件失败: %w", err)
+	}
+	defer outputFile.Close()
+	_, err = tag.WriteTo(outputFile)
+	if err != nil {
+		return fmt.Errorf("写入 ID3 标签失败: %w", err)
+	}
+	_, err = io.Copy(outputFile, reader)
+	if err != nil {
+		return fmt.Errorf("写入文件失败: %w", err)
+	}
+	return nil
 }
 
 // FLAC 容器封装 (Metadata Block 标准)
 func (n *NeteaseCloudMusicFile) EncapsulateFlac(outputPath string, noMeta bool, noCv bool) error {
-	// 1. 先将解密出来的无损数据流写入目标文件
-	err := os.WriteFile(outputPath, n.MusicStream, 0644)
-	if err != nil {
-		return fmt.Errorf("写入 FLAC 基础音频流失败: %w", err)
-	}
+	defer n.MusicStream.Close()
 
 	// 2. 解析刚写入的 FLAC 二进制骨架
-	f, err := flac.ParseFile(outputPath)
+	f, err := flac.ParseBytes(n.MusicStream)
 	if err != nil {
 		return fmt.Errorf("解析 FLAC 容器失败: %w", err)
 	}

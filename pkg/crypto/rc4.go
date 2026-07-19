@@ -1,15 +1,20 @@
 package crypto
 
-type NCMRC4 struct {
-	key    []byte
-	keyBox [256]byte // 核心密钥映射表
-	keyPos uint8     // 字节流指针位置
+import (
+	"crypto/subtle"
+	"io"
+)
+
+type NCMRC4Streaming struct {
+	keyBox [256]uint8 // 核心密钥映射表
+	keyPos uint8      // 字节流指针位置
+	reader io.Reader
 }
 
-func NewNCMRC4(key []byte) *NCMRC4 {
-	ncm := &NCMRC4{
-		key:    key,
+func NewNCMRC4Streaming(reader io.Reader, key []byte) *NCMRC4Streaming {
+	ncm := &NCMRC4Streaming{
 		keyPos: 0,
+		reader: reader,
 	}
 
 	// 1. 初始化标准 S 盒 (0, 1, 2 ... 255)
@@ -44,12 +49,26 @@ func NewNCMRC4(key []byte) *NCMRC4 {
 	return ncm
 }
 
-// Decrypt 执行流解密（原地修改）
-func (n *NCMRC4) Decrypt(data []byte) {
-	for i := range data {
-		// 异或解密
-		data[i] ^= n.keyBox[n.keyPos]
-		// n.keyPos = (n.keyPos + 1) & 0xFF
-		n.keyPos = n.keyPos + 1
+func (n *NCMRC4Streaming) Close() error {
+	if closer, ok := n.reader.(io.Closer); ok {
+		return closer.Close()
 	}
+	return nil
+}
+
+func (n *NCMRC4Streaming) Read(p []byte) (int, error) {
+	nBytes, err := n.reader.Read(p)
+	if err != nil {
+		return 0, err
+	}
+
+	p = p[:nBytes]
+
+	for len(p) > 0 {
+		l := subtle.XORBytes(p, p, n.keyBox[n.keyPos:])
+		n.keyPos += uint8(l)
+		p = p[l:]
+	}
+
+	return nBytes, nil
 }

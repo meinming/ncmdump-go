@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
 	"ncmdump/pkg/logger"
 )
 
@@ -23,7 +24,7 @@ type NcmMetadata struct {
 	MusicName string       `json:"musicName"` //"カタオモイ",
 	Artist    []ArtistInfo `json:"artist"`    //[["Aimer", 16152]],
 	Album     string       `json:"album"`     //"daydream",
-	AlbumPic  string       `json:"albumPic"`  //http://p1.music.126.net/2QRYxUqXfW0zQpm2_DVYRA==/109951165052089697.jpg"
+	AlbumPic  string       `json:"albumPic"`  // http://p1.music.126.net/2QRYxUqXfW0zQpm2_DVYRA==/109951165052089697.jpg"
 	// musicId int64          //431259256,
 	// albumId	int64		  // 34826361,
 	// albumPicDocId int64    // 109951165052089697,

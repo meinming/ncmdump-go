@@ -1,14 +1,15 @@
 package core
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
-	"ncmdump/pkg/crypto"
-	"ncmdump/pkg/logger"
 	"net/http"
 	"os"
+	"slices"
+
+	"ncmdump/pkg/crypto"
+	"ncmdump/pkg/logger"
 )
 
 type NeteaseCloudMusicFile struct {
@@ -17,7 +18,7 @@ type NeteaseCloudMusicFile struct {
 	Rc4Key      []byte
 	CoverPic    []byte
 	Metadata    *crypto.NcmMetadata
-	MusicStream []byte
+	MusicStream io.ReadCloser
 }
 
 func NewNeteaseCloudMusicFile(path string) *NeteaseCloudMusicFile {
@@ -30,36 +31,59 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 		return fmt.Errorf("Failed to read file:%w", err)
 	}
 	n.file = file
-	defer n.file.Close()
+	fileConsumed := true
+	defer func() {
+		if fileConsumed {
+			n.file.Close()
+		}
+	}()
 
 	// Magic Header Check
-	headerBytes := make([]byte, 8)
-	_, err = n.file.Read(headerBytes)
+	headerBytes := make([]byte, 8+6)
+	_, err = io.ReadFull(n.file, headerBytes)
 	if err != nil {
 		return fmt.Errorf("Failed to read Header: %w", err)
 	}
-	if string(headerBytes) != "CTENFDAM" {
+	if slices.Equal(headerBytes[:4], []byte{'f', 'L', 'a', 'C'}) {
+		n.Metadata = &crypto.NcmMetadata{
+			Format: "flac",
+		}
+		_, err = n.file.Seek(0, io.SeekStart)
+		if err != nil {
+			return fmt.Errorf("Failed to seek file: %w", err)
+		}
+		fileConsumed = false
+		n.MusicStream = n.file
+		return nil
+	}
+	if slices.Equal(headerBytes[:3], []byte{0x49, 0x44, 0x33}) {
+		n.Metadata = &crypto.NcmMetadata{
+			Format: "mp3",
+		}
+		_, err = n.file.Seek(0, io.SeekStart)
+		if err != nil {
+			return fmt.Errorf("Failed to seek file: %w", err)
+		}
+		fileConsumed = false
+		n.MusicStream = n.file
+		return nil
+	}
+	if string(headerBytes[:8]) != "CTENFDAM" {
 		return fmt.Errorf("Not a valid NetEase Cloud Music (NCM) file.")
 	}
 	logger.Debug("NCM Verify is sucessed.")
 
-	_, _ = n.file.Seek(2, 1) // 移动2位
-
-	lengthBytes := make([]byte, 4)
-	_, err = n.file.Read(lengthBytes)
-	if err != nil {
-		return fmt.Errorf("Failed to read Length of AES key: %w", err)
-	}
-	keyLength := binary.LittleEndian.Uint32(lengthBytes)
+	lengthBytes := headerBytes[8:]
+	keyLength := binary.LittleEndian.Uint32(lengthBytes[2:])
 	logger.Debug("Reading length of AES key is succeed: %v bytes", keyLength)
 
-	keyCiphertext := make([]byte, keyLength)
-	_, err = n.file.Read(keyCiphertext)
+	keyCiphertextAndMetadataLength := make([]byte, keyLength+4)
+	_, err = io.ReadFull(n.file, keyCiphertextAndMetadataLength)
 	if err != nil {
 		return fmt.Errorf("Failed to read key cipher: %w", err)
 	}
 
-	h := crypto.Decoder{Rc4KeyEnc: keyCiphertext}
+	h := crypto.Decoder{Rc4KeyEnc: keyCiphertextAndMetadataLength[:keyLength]}
 
 	err = h.DecryptRC4Key()
 	if err != nil {
@@ -67,34 +91,23 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 	}
 	n.Rc4Key = h.Rc4Key
 
-	metaLengthBytes := make([]byte, 4)
-	_, err = n.file.Read(metaLengthBytes)
-	if err != nil {
-		return fmt.Errorf("Failed to read metadata length: %w", err)
-	}
-	h.MetadataEncSize = binary.LittleEndian.Uint32(metaLengthBytes)
+	h.MetadataEncSize = binary.LittleEndian.Uint32(keyCiphertextAndMetadataLength[keyLength:])
 	logger.Debug("Reading length of metadata is succeed: %v bytes", h.MetadataEncSize)
-	metadataEnc := make([]byte, h.MetadataEncSize)
-	_, err = n.file.Read(metadataEnc)
+	metadataEnc := make([]byte, h.MetadataEncSize+9+4)
+	_, err = io.ReadFull(n.file, metadataEnc)
 	if err != nil {
 		return fmt.Errorf("Failed to read metadata cipher: %w", err)
 	}
-	h.MetadataEnc = metadataEnc
+	h.MetadataEnc = metadataEnc[:h.MetadataEncSize]
 	err = h.DecryptMetadata()
 	if err != nil {
 		return fmt.Errorf("Failed to decrypt metadata: %w", err)
 	}
 	n.Metadata = h.Metadata
 
-	_, _ = n.file.Seek(5+4, 1) // 跳过 5 字节 gap + 4 字节 cover crc = 9 字节
-
-	coverLengthBytes := make([]byte, 4)
-	_, err = n.file.Read(coverLengthBytes)
-	if err != nil {
-		return fmt.Errorf("Failed to read Length of cover: %w", err)
-	}
-	coverLength := binary.LittleEndian.Uint32(coverLengthBytes)
+	coverLength := binary.LittleEndian.Uint32(metadataEnc[h.MetadataEncSize+9:])
 	logger.Debug("Reading length of cover is succeed: %d bytes", coverLength)
+
 	switch n.Metadata.Format {
 	case "flac":
 		if coverLength != 0 {
@@ -102,7 +115,6 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 			n.CoverPic = make([]byte, coverLength)
 			_, err = n.file.Read(n.CoverPic)
 			// os.WriteFile("test.png", CoverPic, 0664)
-
 			if err != nil {
 				return fmt.Errorf("读取 FLAC 本地封面字节失败: %w", err)
 			}
@@ -119,7 +131,6 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 			n.CoverPic = make([]byte, coverLength)
 			_, err = n.file.Read(n.CoverPic)
 			// os.WriteFile("test.png", CoverPic, 0664)
-
 			if err != nil {
 				return fmt.Errorf("读取 MP3 本地封面字节失败: %w", err)
 			}
@@ -133,30 +144,8 @@ func (n *NeteaseCloudMusicFile) Decrypt() error {
 		}
 	}
 
-	var musicStream bytes.Buffer
-	buf := make([]byte, 32*1024)
-	ncmRc4 := crypto.NewNCMRC4(n.Rc4Key)
-	logger.Debug("正在解密流媒体：%v", n.Metadata.MusicName)
-	for {
-		r, err := n.file.Read(buf)
-		if r > 0 {
-			currentBlock := buf[:r]
-			ncmRc4.Decrypt(currentBlock)
-
-			_, writeErr := musicStream.Write(currentBlock)
-			if writeErr != nil {
-				return fmt.Errorf("写入二进制流失败: %w", writeErr)
-			}
-		}
-
-		if err == io.EOF {
-			break // 文件读完了，安全退出
-		}
-		if err != nil {
-			return fmt.Errorf("读取音频数据失败: %w", err)
-		}
-	}
-	n.MusicStream = musicStream.Bytes()
+	fileConsumed = false
+	n.MusicStream = crypto.NewNCMRC4Streaming(n.file, n.Rc4Key)
 
 	return nil
 }
